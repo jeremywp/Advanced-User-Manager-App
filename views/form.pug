@@ -1,0 +1,15 @@
+form(id='myForm', method='get', action='/create')
+    div
+        label(for='first') First name:
+        input(type='text', id='first', name='first')
+    div
+        label(for='last') Last name:
+        input(type='text', id='last', name='last')
+    div
+        label(for='email') Email:
+            input(type='email', id='email', name='email')
+    div
+        label(for='age') Age:
+            input(type='number', id='age', name='age')
+    div
+        input(type='submit', value='Add User')

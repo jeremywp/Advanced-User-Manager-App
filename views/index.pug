@@ -1,0 +1,17 @@
+html
+    head
+        title Login for OAuth Example
+    body
+        form(method='post' action='login')
+            div
+                label(for='username') username
+                input(type='text', name='username', id='username')
+            div
+                label(for='password') password:
+                input(type='password', name='password', id='password')
+            div
+                input(type='submit')
+            br
+            br
+            br
+            a(HREF='auth/google') Sign in with Google

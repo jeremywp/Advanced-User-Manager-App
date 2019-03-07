@@ -1,0 +1,21 @@
+html
+    head
+        title Edit User
+    body
+        h1 Edit #{first} #{last}
+
+        form(id='myForm', method='get', action='/edit')
+            div
+                label(for='first') First name:
+                input(type='text', id='first', name='first', value= first)
+            div
+                label(for='last') Last name:
+                input(type='text', id='last', name='last', value= last)
+            div
+                label(for='email') Email:
+                    input(type='email', id='email', name='email', value= email)
+            div
+                label(for='age') Age:
+                    input(type='number', id='age', name='age', value= age)
+            div
+                input(type='submit', value='Edit User')

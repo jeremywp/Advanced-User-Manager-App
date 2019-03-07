@@ -1,0 +1,25 @@
+html
+    head
+        title User Listing
+    body
+        h1 User Listing
+
+        table
+            tr
+                th First
+                th Last
+                th Email
+                th Age
+                th Edit
+                th Delete
+            each user in users
+                tr
+                    td #{user.first}
+                    td #{user.last}
+                    td #{user.email}
+                    td #{user.age}
+                    td
+                        a(href='/editUser?first=' + user.first + "&last=" + user.last) edit
+                    td
+                        a(href='/deleteUser?first=' + user.first + "&last=" + user.last) delete
+        a(href="addUser") Add User
