@@ -135,18 +135,18 @@ app.get('/editUser*', (req, res) => {
         if (err) throw err;
         let obj = JSON.parse(data);
 
-        for (i = 0; i < obj.users.length; i++) {
+        for (let i = 0; i < obj.users.length; i++) {
             if (obj.users[i].first === req.query.first && obj.users[i].last === req.query.last) {
                 targetUser = obj.users[i];
                 index = i;
-                res.render('editUser', {
-                    first: targetUser.first,
-                    last: targetUser.last,
-                    email: targetUser.email,
-                    age: targetUser.age
-                });
             }
         }
+        res.render('editUser', {
+            first: targetUser.first,
+            last: targetUser.last,
+            email: targetUser.email,
+            age: targetUser.age
+        });
     });
 });
 
