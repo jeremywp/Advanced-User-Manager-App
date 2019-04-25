@@ -1,18 +1,18 @@
 const express = require('express');
+const pg = require('pg');
 const path = require('path');
+const uuidv4 = require('uuid/v4');
 let bodyParser = require('body-parser');
 const fs = require('fs');
 const passport = require('passport');
 const session = require('express-session');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
+const port = process.env.PORT || 8080;
+
 const router = express.Router();
 
 const app = express();
-
-let userlist = [];
-
-let index;
 
 app.use(express.urlencoded({extended: false}));
 
@@ -20,11 +20,11 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 app.use(session({
-    secret: 'some secret string',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {maxAge: 6e5}
-    }
+      secret: 'some secret string',
+      resave: false,
+      saveUninitialized: false,
+      cookie: {maxAge: 6e5}
+  }
 ));
 
 app.use(passport.initialize());
@@ -35,6 +35,14 @@ passport.serializeUser((user, done) => {
 passport.deserializeUser((user, done) => {
     done(null, user);
 });
+
+const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/users';
+const client = new pg.Client(connectionString);
+client.connect();
+
+let userlist = [];
+
+let index;
 
 passport.use(new GoogleStrategy({
     //options object
@@ -68,9 +76,27 @@ app.get('/', (req, res) => {
 
 app.get('/create', (req, res) => {
 
-    let user = {"email": req.query.email, "first": req.query.first, "last": req.query.last, "age": req.query.age};
+    let email = req.query.email;
+    let first = req.query.first;
+    let last = req.query.last;
+    let age = req.query.age;
+    let id = uuidv4();
 
-    fs.readFile(path.join(__dirname, 'users.json'), 'utf-8', (err, data) => {
+    let user = {"email": email, "first": first, "last": last, "age": age, "id": id};
+
+    const text = 'INSERT into users (email, first, last, age, id) VALUES($1, $2, $3, $4, $5) RETURNING *';
+    const values = [email, first, last, age, id];
+
+    client.query(text, values, (err, result) => {
+        if (err) {
+            console.log(err.stack)
+        } else {
+            console.log(result.rows[0]);
+            res.send(`User ${req.query.first} ${req.query.last} added, with email ${req.query.email}. <a href="userListing">User Listings</a>`);
+        }
+    });
+
+   /* fs.readFile(path.join(__dirname, 'users.json'), 'utf-8', (err, data) => {
         if (err) throw err;
         let obj = JSON.parse(data);
         for (let i = 0; i < obj.users.length; i++){
@@ -88,7 +114,7 @@ app.get('/create', (req, res) => {
         } else {
             res.send(`That email is already in use. <a href="addUser">Add User</a>`)
         }
-    });
+    });*/
 
 });
 
@@ -98,14 +124,25 @@ app.get('/addUser', (req, res) => {
 
 app.get('/userListing', (req, res) => {
 
-    fs.readFile(path.join(__dirname, 'users.json'), 'utf-8', (err, data) => {
+    const text = 'select * from users';
+
+    client.query(text, (err, result) => {
+        if (err) {
+            console.log(err.stack)
+        } else {
+            console.log(result.rows);
+            res.render('userListing', {users: result.rows})
+        }
+    });
+
+    /*fs.readFile(path.join(__dirname, 'users.json'), 'utf-8', (err, data) => {
         if (err) throw err;
         let obj = JSON.parse(data);
         for (let i = 0; i < obj.users.length; i++){
             userlist.push(obj.users[i]);
         }
         res.render('userListing', {users: obj.users})
-    });
+    });*/
 
    /* if (req.user && !userlist.some(user => user.displayName === req.user.displayName)) {
     userlist.push(req.user);
@@ -124,19 +161,34 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
-app.get('/users', (req, res) => {
-    res.render('users');
-});
+app.get('/editUser/:id', (req, res) => {
+    let userName = req.params.id;
+    console.log(`GET /editUser/:id ${JSON.stringify(req.params)}`);
 
-app.get('/editUser*', (req, res) => {
-    let targetUser;
+    const text = 'select * from users where id = $1';
+    const values =  [userName];
 
-    fs.readFile(path.join(__dirname, 'users.json'), 'utf-8', (err, data) => {
+    client.query(text, values, (err, result) => {
+        if (err) {
+            console.log(err.stack)
+        } else {
+            console.log(result.rows[0]);
+            res.render('editUser', {
+                first: result.rows[0].first,
+                last: result.rows[0].last,
+                email: result.rows[0].email,
+                age: result.rows[0].age,
+                id: result.rows[0].id
+            });
+        }
+    });
+
+    /*fs.readFile(path.join(__dirname, 'users.json'), 'utf-8', (err, data) => {
         if (err) throw err;
         let obj = JSON.parse(data);
 
         for (let i = 0; i < obj.users.length; i++) {
-            if (obj.users[i].first === req.query.first && obj.users[i].last === req.query.last) {
+            if (obj.users[i].id === req.query.id) {
                 targetUser = obj.users[i];
                 index = i;
             }
@@ -145,34 +197,68 @@ app.get('/editUser*', (req, res) => {
             first: targetUser.first,
             last: targetUser.last,
             email: targetUser.email,
-            age: targetUser.age
+            age: targetUser.age,
+            id: targetUser.id
         });
-    });
+    });*/
 });
 
-app.get('/edit*', (req, res) => {
+app.get(`/edit/`, (req, res) => {
+    console.log(req.query);
 
-    fs.readFile(path.join(__dirname, 'users.json'), 'utf-8', (err, data) => {
+    let email = req.query.email;
+    let first = req.query.first;
+    let last = req.query.last;
+    let age = req.query.age;
+    let id = req.query.id;
+
+    console.log(`GET /edit/:id ${JSON.stringify(req.query)}`);
+
+    const text = `update users set email = '${email}', first = '${first}', last = '${last}', age = ${age} where id = $1`;
+    const values =  [id];
+
+    client.query(text, values, (err, result) => {
+        if (err) {
+            console.log(err.stack)
+        } else {
+            console.log(req.query);
+            res.send(`User ${req.query.first} ${req.query.last} edited. <a href="/userListing">User Listings</a>`);
+        }
+    });
+
+    /*fs.readFile(path.join(__dirname, 'users.json'), 'utf-8', (err, data) => {
         if (err) throw err;
         let obj = JSON.parse(data);
 
-        obj.users.splice(index, 1, {"first": req.query.first, "last": req.query.last, "email": req.query.email, "age": req.query.age});
+        obj.users.splice(index, 1, {"first": req.query.first, "last": req.query.last, "email": req.query.email, "age": req.query.age, "id": req.query.id});
         fs.writeFile(path.join(__dirname, 'users.json'), JSON.stringify(obj), 'utf-8', (err) => {
             if (err) throw err;
             res.send(`User ${req.query.first} ${req.query.last} edited. <a href="userListing">User Listings</a>`);
         });
-    });
+    });*/
 
 });
 
-app.get('/deleteUser*', (req, res) => {
+app.get('/deleteUser/', (req, res) => {
+    let userName = req.query.id;
 
-    fs.readFile(path.join(__dirname, 'users.json'), 'utf-8', (err, data) => {
+    const text = 'delete from users where id = $1';
+    const values =  [userName];
+
+    client.query(text, values, (err, result) => {
+        if (err) {
+            console.log(err.stack)
+        } else {
+            res.send(`User deleted. <a href="/userListing">User Listings</a>`);
+        }
+    });
+
+   /* fs.readFile(path.join(__dirname, 'users.json'), 'utf-8', (err, data) => {
         if (err) throw err;
         let obj = JSON.parse(data);
 
         for (let i = 0; i < obj.users.length; i++){
-            if (obj.users[i].first === req.query.first && obj.users[i].last === req.query.last){
+            if (obj.users[i].id === req.query.id){
                 obj.users.splice(i, 1);
 
             }
@@ -183,10 +269,10 @@ app.get('/deleteUser*', (req, res) => {
             res.send(`User ${req.query.first} ${req.query.last} deleted. <a href="userListing">User Listings</a>`);
         });
 
-    });
+    });*/
 
 });
 
-app.listen(3000, () => {
-    console.log("Listening on port 3000")
+app.listen(port, () => {
+    console.log(`Listening on port ${port}`);
 });

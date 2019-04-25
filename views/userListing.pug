@@ -19,7 +19,7 @@ html
                     td #{user.email}
                     td #{user.age}
                     td
-                        a(href='/editUser?first=' + user.first + "&last=" + user.last) edit
+                        a(href='/editUser/' + user.id) edit
                     td
-                        a(href='/deleteUser?first=' + user.first + "&last=" + user.last) delete
+                        a(href='/deleteUser?id=' + user.id) delete
         a(href="addUser") Add User
