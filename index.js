@@ -3,7 +3,6 @@ const pg = require('pg');
 const path = require('path');
 const uuidv4 = require('uuid/v4');
 let bodyParser = require('body-parser');
-const fs = require('fs');
 const passport = require('passport');
 const session = require('express-session');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
@@ -39,10 +38,6 @@ passport.deserializeUser((user, done) => {
 const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/users';
 const client = new pg.Client(connectionString);
 client.connect();
-
-let userlist = [];
-
-let index;
 
 passport.use(new GoogleStrategy({
     //options object
@@ -82,8 +77,6 @@ app.get('/create', (req, res) => {
     let age = req.query.age;
     let id = uuidv4();
 
-    let user = {"email": email, "first": first, "last": last, "age": age, "id": id};
-
     const text = 'INSERT into users (email, first, last, age, id) VALUES($1, $2, $3, $4, $5) RETURNING *';
     const values = [email, first, last, age, id];
 
@@ -95,65 +88,52 @@ app.get('/create', (req, res) => {
             res.send(`User ${req.query.first} ${req.query.last} added, with email ${req.query.email}. <a href="userListing">User Listings</a>`);
         }
     });
-
-   /* fs.readFile(path.join(__dirname, 'users.json'), 'utf-8', (err, data) => {
-        if (err) throw err;
-        let obj = JSON.parse(data);
-        for (let i = 0; i < obj.users.length; i++){
-            userlist.push(obj.users[i].email);
-        }
-
-        console.log(userlist);
-        if (userlist.indexOf(user.email) === -1) {
-            obj.users.push(user);
-
-            fs.writeFile(path.join(__dirname, 'users.json'), JSON.stringify(obj), 'utf-8', (err) => {
-                if (err) throw err;
-                res.send(`User ${req.query.first} ${req.query.last} added, with email ${req.query.email}. <a href="userListing">User Listings</a>`);
-            });
-        } else {
-            res.send(`That email is already in use. <a href="addUser">Add User</a>`)
-        }
-    });*/
-
 });
 
 app.get('/addUser', (req, res) => {
     res.render('addUser');
 });
 
-app.get('/userListing', (req, res) => {
 
-    const text = 'select * from users';
+
+app.get('/userListing', (req, res) => {
+    let text = `select * from users order by last`;
+
+    client.query(text, (err, result) => {
+        if (err) {
+            console.log(err.stack)
+        } else {
+            res.render('userListing', {users: result.rows})
+        }
+    });
+});
+
+app.get('/userListing/:column', (req, res) => {
+    let text = `select * from users order by ${req.params.column}`;
+
+    client.query(text, (err, result) => {
+        if (err) {
+            console.log(err.stack)
+        } else {
+            res.render('userListing', {users: result.rows})
+        }
+    });
+});
+
+app.get('/search', (req, res) => {
+
+    console.log(req.query.search);
+
+    const text = `select * from users where first ilike '%${req.query.search}%' or last ilike '%${req.query.search}%' or email ilike '%${req.query.search}%' or age ilike '%${req.query.search}%'`;
 
     client.query(text, (err, result) => {
         if (err) {
             console.log(err.stack)
         } else {
             console.log(result.rows);
-            res.render('userListing', {users: result.rows})
+            res.render('search', {users: result.rows})
         }
     });
-
-    /*fs.readFile(path.join(__dirname, 'users.json'), 'utf-8', (err, data) => {
-        if (err) throw err;
-        let obj = JSON.parse(data);
-        for (let i = 0; i < obj.users.length; i++){
-            userlist.push(obj.users[i]);
-        }
-        res.render('userListing', {users: obj.users})
-    });*/
-
-   /* if (req.user && !userlist.some(user => user.displayName === req.user.displayName)) {
-    userlist.push(req.user);
-    console.log(req.user);
-
-}
-    else {
-        res.send(`<a href='/'>Login again</a>`)
-    }
-*/
-
 });
 
 app.get('/logout', (req, res) => {
@@ -182,25 +162,6 @@ app.get('/editUser/:id', (req, res) => {
             });
         }
     });
-
-    /*fs.readFile(path.join(__dirname, 'users.json'), 'utf-8', (err, data) => {
-        if (err) throw err;
-        let obj = JSON.parse(data);
-
-        for (let i = 0; i < obj.users.length; i++) {
-            if (obj.users[i].id === req.query.id) {
-                targetUser = obj.users[i];
-                index = i;
-            }
-        }
-        res.render('editUser', {
-            first: targetUser.first,
-            last: targetUser.last,
-            email: targetUser.email,
-            age: targetUser.age,
-            id: targetUser.id
-        });
-    });*/
 });
 
 app.get(`/edit/`, (req, res) => {
@@ -225,18 +186,6 @@ app.get(`/edit/`, (req, res) => {
             res.send(`User ${req.query.first} ${req.query.last} edited. <a href="/userListing">User Listings</a>`);
         }
     });
-
-    /*fs.readFile(path.join(__dirname, 'users.json'), 'utf-8', (err, data) => {
-        if (err) throw err;
-        let obj = JSON.parse(data);
-
-        obj.users.splice(index, 1, {"first": req.query.first, "last": req.query.last, "email": req.query.email, "age": req.query.age, "id": req.query.id});
-        fs.writeFile(path.join(__dirname, 'users.json'), JSON.stringify(obj), 'utf-8', (err) => {
-            if (err) throw err;
-            res.send(`User ${req.query.first} ${req.query.last} edited. <a href="userListing">User Listings</a>`);
-        });
-    });*/
-
 });
 
 app.get('/deleteUser/', (req, res) => {
@@ -252,25 +201,6 @@ app.get('/deleteUser/', (req, res) => {
             res.send(`User deleted. <a href="/userListing">User Listings</a>`);
         }
     });
-
-   /* fs.readFile(path.join(__dirname, 'users.json'), 'utf-8', (err, data) => {
-        if (err) throw err;
-        let obj = JSON.parse(data);
-
-        for (let i = 0; i < obj.users.length; i++){
-            if (obj.users[i].id === req.query.id){
-                obj.users.splice(i, 1);
-
-            }
-        }
-
-        fs.writeFile(path.join(__dirname, 'users.json'), JSON.stringify(obj), 'utf-8', (err) => {
-            if (err) throw err;
-            res.send(`User ${req.query.first} ${req.query.last} deleted. <a href="userListing">User Listings</a>`);
-        });
-
-    });*/
-
 });
 
 app.listen(port, () => {
